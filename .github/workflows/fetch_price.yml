@@ -1,0 +1,41 @@
+name: Fetch QQQM daily close
+
+on:
+  schedule:
+    # 22:30 UTC, Mon-Fri = 6:30pm EDT / 5:30pm EST -- safely after the 4pm ET
+    # US market close in both daylight-saving states.
+    - cron: "30 22 * * 1-5"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install yfinance
+
+      - name: Fetch latest close and update market_data.json
+        run: python fetch_price.py
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- market_data.json; then
+            echo "No changes to market_data.json -- nothing to commit."
+          else
+            git add market_data.json
+            git commit -m "Update market_data.json ($(date -u +%Y-%m-%d))"
+            git push
+          fi
